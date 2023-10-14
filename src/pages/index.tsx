@@ -1,11 +1,79 @@
 import Head from "next/head";
 import Link from "next/link";
-
+import { useState, useEffect } from "react"
 import { api } from "substantive_project/utils/api";
-
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend
+} from 'recharts';
 export default function Home() {
-  const hello = api.example.hello.useQuery({ text: "from tRPC" });
+  interface PieData {
+    name: string;
+    value: number;
+  }
+  interface BarData {
+    date: string;
+    count: number;
+  }
+  interface DataPoint {
+    date: string;
+    name: string;
+    sector_id: string;
+  }
 
+  type Interaction = {
+    date: string;
+    name: string;
+    sector_id: string;
+  };
+  const COLORS = [
+    '#0088FE', // blue
+    '#00C49F', // teal
+    '#FFBB28', // yellow
+    '#FF8042', // orange
+    '#8B008B', // dark magenta
+    '#E32636', // alizarin
+    '#FF00FF', // magenta
+    '#7FFF00', // chartreuse
+    '#6B8E23', // olive drab
+    '#7F0000', // dark red
+    '#FFFFFF'  // dark slate blue
+  ];
+
+
+  const [barData, setBarData] = useState<BarData[]>([]); // Add state for barData
+  const [pieData, setPieData] = useState([] as PieData[])
+
+
+  const response = api.example.getData.useQuery();
+  useEffect(() => {
+
+    //console.log("data is", response)
+    if (response?.data?.interactions) {
+      const countByName = (data: DataPoint[]): Map<string, number> => {
+        return data.reduce((map, item) => {
+          map.set(item.name, (map.get(item.name) ?? 0) + 1);
+          return map;
+        }, new Map<string, number>());
+      };
+      const convertMapToPieData = (map: Map<string, number>): PieData[] => {
+        return Array.from(map).map(([name, value]) => ({ name, value }));
+      };
+      const nameCountMap = countByName(response.data.interactions);
+      setPieData(convertMapToPieData(nameCountMap))
+      // setData(response.data.data)
+      console.log("data is", response.data.interactions[0])
+      const countByDate = response.data.interactions.reduce((map, interaction) => {
+        map.set(interaction.date, (map.get(interaction.date) ?? 0) + 1);
+        return map;
+      }, new Map<string, number>());
+
+      // Convert the map to the BarData array format
+      const newBarData: BarData[] = Array.from(countByDate).map(([date, count]) => ({ date, count }));
+
+      // Update the barData state
+      setBarData(newBarData);
+    }
+  }, [response.data?.interactions])
   return (
     <>
       <Head>
@@ -15,36 +83,55 @@ export default function Home() {
       </Head>
       <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#2e026d] to-[#15162c]">
         <div className="container flex flex-col items-center justify-center gap-12 px-4 py-16 ">
-          <h1 className="text-5xl font-extrabold tracking-tight text-white sm:text-[5rem]">
-            Create <span className="text-[hsl(280,100%,70%)]">T3</span> App
+          <h1 className="text-5xl font-extrabold tracking-tight text-white sm:text-[5rem] text-center">
+            Gareth Dawson&apos;s <span className="text-[hsl(280,100%,70%)]">Substantive Research</span>  Dashboard
           </h1>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
-            <Link
-              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 text-white hover:bg-white/20"
-              href="https://create.t3.gg/en/usage/first-steps"
-              target="_blank"
-            >
-              <h3 className="text-2xl font-bold">First Steps →</h3>
-              <div className="text-lg">
-                Just the basics - Everything you need to know to set up your
-                database and authentication.
-              </div>
-            </Link>
-            <Link
-              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 text-white hover:bg-white/20"
-              href="https://create.t3.gg/en/introduction"
-              target="_blank"
-            >
-              <h3 className="text-2xl font-bold">Documentation →</h3>
-              <div className="text-lg">
-                Learn more about Create T3 App, the libraries it uses, and how
-                to deploy it.
-              </div>
-            </Link>
+
+
+          <div className="flex !flex-col gap-2 p-2 bg-white/10 rounded-xl max-w-full text-white hover:bg-white/20 md:max-w-8xl md:flex-row md:items-center">
+            <h2 className="text-xl md:text-2xl md:w-11/12 md:mb-0">Sector Distribution</h2>
+            <div className="w-full pb-1/1 md:w-12/12 md:h-auto md:pb-0">
+
+              <PieChart width={700} height={400} className="px-4">
+                <Pie
+                  data={pieData}
+                  cx={300}
+                  cy={200}
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={120}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {
+                    pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)
+                  }
+                </Pie>
+                <Tooltip position={{ x: 300, y: 200 }} />
+                {/* <Legend /> */}
+              </PieChart>
+            </div>
           </div>
-          <p className="text-2xl text-white">
-            {hello.data ? hello.data.greeting : "Loading tRPC query..."}
-          </p>
+          <div className="flex !flex-col gap-2 p-2 bg-white/10 rounded-xl max-w-full text-white hover:bg-white/20 md:max-w-8xl md:flex-row md:items-center">
+            <h2 className="text-xl md:text-2xl md:w-11/12 md:mb-0">Interactions Per Day</h2>
+            <div className="w-full pb-1/1 md:w-12/12 md:h-auto md:pb-0">
+              <BarChart
+                width={600}
+                height={300}
+                data={barData}
+                margin={{
+                  top: 20, right: 30, left: 20, bottom: 5,
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="count" fill="#82ca9d" />
+              </BarChart>
+            </div>
+          </div>
         </div>
       </main>
     </>
